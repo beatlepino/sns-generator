@@ -49,24 +49,33 @@ export default function App() {
   };
 
   const generate = async () => {
-    if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが未設定です。Vercel設定を確認してください。' }); return; }
+    if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが未設定です。' }); return; }
     setIsLoading(true);
     setResult('');
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `SNS告知作成：イベント名:${eventName} 詳細:${eventDetails} キャラ設定:${CHARACTER_PROMPTS[charKey]} 付随情報:${appended}。挨拶不要、本文のみ180文字以内で作成。`;
+    const prompt = `イベント「${eventName}」の告知文を${CHARACTER_PROMPTS[charKey]}で作成してください。\n詳細:${eventDetails}\n${appended}\n※180文字以内、挨拶不要、本文のみ出力。`;
 
     try {
+      // 認証をURLパラメータで送る形式に固定
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
+      
       const data = await response.json();
+      
       if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`.trim());
-      } else { throw new Error("API接続エラー"); }
-    } catch (e) { setMessage({ type: 'error', text: '生成エラー: ' + e.message }); }
-    finally { setIsLoading(false); }
+      } else {
+        // エラー詳細を表示
+        throw new Error(data.error?.message || "不明なAPIエラー");
+      }
+    } catch (e) {
+      setMessage({ type: 'error', text: `接続エラー: ${e.message}` });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
