@@ -37,88 +37,45 @@ export default function App() {
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [isShortening, setIsShortening] = useState([false, false, false]);
 
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-  const shortenUrl = async (index) => {
-    const url = urls[index];
-    if (!url) return;
-    const newShortening = [...isShortening];
-    newShortening[index] = true;
-    setIsShortening(newShortening);
-    setMessage(null);
-    try {
-      const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);
-      if (!res.ok) throw new Error('ネットワークエラー');
-      const data = await res.json();
-      if (data.shorturl) {
-        const newUrls = [...urls];
-        newUrls[index] = data.shorturl;
-        setUrls(newUrls);
-        setMessage({ type: 'success', text: '短縮完了！' });
-      } else {
-        throw new Error('短縮失敗');
-      }
-    } catch (e) {
-      setMessage({ type: 'error', text: '短縮失敗' });
-    } finally {
-      const reset = [...isShortening];
-      reset[index] = false;
-      setIsShortening(reset);
-    }
-  };
-
   const generate = async () => {
     if (!API_KEY) {
-      setMessage({ type: 'error', text: 'APIキー未設定' });
-      return;
-    }
-    if (!eventName || !eventDetails) {
-      setMessage({ type: 'error', text: '必須項目を入力してください' });
+      setMessage({ type: 'error', text: 'APIキーが設定されていません。' });
       return;
     }
     setIsLoading(true);
-    setResult('');
     setMessage(null);
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `あなたはSNSプロです。以下を元に180文字以内の告知文を作成し、本文のみ出力してください。\nイベント名:${eventName}\n詳細:${eventDetails}\n設定:${CHARACTER_PROMPTS[charKey]}\n付随:${appended}`;
+    const prompt = `あなたはSNS投稿のプロです。以下の情報を元に180文字以内で告知文を作成してください。\nイベント名:${eventName}\n詳細:${eventDetails}\n設定:${CHARACTER_PROMPTS[charKey]}\n付随:${appended}`;
 
     try {
       const res = await fetch('[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=)' + API_KEY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       const data = await res.json();
-      const body = data.candidates[0].content.parts[0].text.trim();
-      setResult(`${body}\n\n${appended}`.trim());
+      if (!res.ok) throw new Error(data.error?.message || '通信エラー');
+      setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`.trim());
     } catch (e) {
-      setMessage({ type: 'error', text: '生成失敗' });
+      setMessage({ type: 'error', text: '生成失敗: ' + e.message });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 space-y-4 bg-white rounded-xl shadow-lg border">
-      <h1 className="text-xl font-bold flex items-center gap-2"><Sparkles className="text-indigo-500"/> SNS生成</h1>
-      {message && <div className={`p-2 text-sm ${message.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{message.text}</div>}
-      <input className="w-full p-2 border rounded" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
-      <textarea className="w-full p-2 border rounded" rows={3} placeholder="詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
-      {urls.map((url, i) => (
-        <div key={i} className="flex gap-2">
-          <input className="flex-1 p-2 border rounded text-sm" placeholder={`URL ${i+1}`} value={url} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />
-          <button onClick={()=>shortenUrl(i)} className="px-3 bg-indigo-100 rounded text-sm">短縮</button>
-        </div>
-      ))}
-      <select className="w-full p-2 border rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
-        {Object.entries(CHARACTERS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-      </select>
-      <input className="w-full p-2 border rounded" placeholder="ハッシュタグ" value={hashtags} onChange={e=>setHashtags(e.target.value)} />
-      <input className="w-full p-2 border rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
-      <button onClick={generate} disabled={isLoading} className="w-full p-3 bg-indigo-600 text-white rounded font-bold">{isLoading ? "生成中..." : "投稿文を生成"}</button>
-      {result && <div className="p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap border">{result}</div>}
+    <div className="max-w-md mx-auto p-6 space-y-4">
+      <h1 className="text-xl font-bold">SNS投稿ジェネレーター</h1>
+      {message && <div className="text-red-500 text-sm">{message.text}</div>}
+      <input className="w-full border p-2" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
+      <textarea className="w-full border p-2" placeholder="詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
+      <button className="w-full bg-indigo-600 text-white p-3 rounded" onClick={generate} disabled={isLoading}>
+        {isLoading ? '生成中...' : '生成'}
+      </button>
+      {result && <div className="p-4 bg-gray-100 whitespace-pre-wrap text-sm">{result}</div>}
     </div>
   );
 }
