@@ -31,26 +31,8 @@ export default function App() {
 
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-  const shortenUrl = async (index) => {
-    const url = urls[index];
-    if (!url) return;
-    const newShortening = [...isShortening];
-    newShortening[index] = true;
-    setIsShortening(newShortening);
-    try {
-      const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);
-      const data = await res.json();
-      if (data.shorturl) {
-        const newUrls = [...urls];
-        newUrls[index] = data.shorturl;
-        setUrls(newUrls);
-      }
-    } catch (e) { setMessage({ type: 'error', text: '短縮失敗' }); }
-    finally { const reset = [...isShortening]; reset[index] = false; setIsShortening(reset); }
-  };
-
   const generate = async () => {
-    if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが設定されていません。' }); return; }
+    if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが未設定です。' }); return; }
     setIsLoading(true);
     setResult('');
     
@@ -58,8 +40,8 @@ export default function App() {
     const prompt = `あなたはSNS投稿作成のプロです。イベント「${eventName}」の告知文を${CHARACTER_PROMPTS[charKey]}で180文字以内で作成してください。挨拶不要、本文のみ出力。\n詳細:${eventDetails}\n付随情報:${appended}`;
 
     try {
-      // 制限を回避しやすい gemini-1.5-flash に戻しました
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+      // 最新かつ最も安定した gemini-2.0-flash を使用します
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,7 +52,7 @@ export default function App() {
       if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`.trim());
       } else {
-        throw new Error(data.error?.message || "モデル接続エラー: API制限または設定を確認してください");
+        throw new Error(data.error?.message || "モデルが指定できませんでした");
       }
     } catch (e) {
       setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
@@ -85,21 +67,9 @@ export default function App() {
       {message && <div className="p-2 bg-red-50 text-red-600 text-sm rounded">{message.text}</div>}
       <input className="w-full p-2 border rounded" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
       <textarea className="w-full p-2 border rounded" rows={3} placeholder="イベント詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
-      
-      {urls.map((u, i) => (
-        <div key={i} className="flex gap-2">
-          <input className="flex-1 p-2 border rounded text-sm" placeholder={`URL ${i+1}`} value={u} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />
-          <button onClick={()=>shortenUrl(i)} className="bg-indigo-100 px-3 rounded text-sm">{isShortening[i] ? '...' : '短縮'}</button>
-        </div>
-      ))}
-      
-      <input className="w-full p-2 border rounded" placeholder="ハッシュタグ" value={hashtags} onChange={e=>setHashtags(e.target.value)} />
-      <input className="w-full p-2 border rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
-      
       <select className="w-full p-2 border rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
         {Object.entries(CHARACTERS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
       </select>
-      
       <button onClick={generate} disabled={isLoading} className="w-full p-3 bg-indigo-600 text-white rounded font-bold">{isLoading ? '生成中...' : '生成する'}</button>
       {result && <div className="p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap">{result}</div>}
     </div>
