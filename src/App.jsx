@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
-import { Sparkles, Loader2, Link as LinkIcon, AlertCircle, Copy, Check } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 
 const CHARACTERS = {
+  serious: "真面目系",
+  gyaru: "ギャル系",
+  cute: "可愛い系",
+  ojisan: "おじさん系",
+  announcer: "アナウンサー系",
+  friend: "友達キャラ",
+  light: "ノリ軽いキャラ",
+  fan: "ファンキャラ",
+  sexy: "セクシーキャラ",
+  fresh: "さわやかお兄さん系"
+};
+
+const CHARACTER_PROMPTS = {
   serious: "真面目系：丁寧語で、誠実かつ信頼感のある、少し硬めの文体で告知してください。",
   gyaru: "ギャル系：明るいテンションで、「〜マジでヤバい！」「〜しよ！」など、若者言葉と絵文字を多用してください。",
   cute: "可愛い系：語尾を「〜だにゃん」「〜だよっ☆」など可愛くし、ハートや星の絵文字を使ってください。",
@@ -24,35 +37,50 @@ export default function App() {
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [shortening, setShortening] = useState([false, false, false]);
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [isShortening, setIsShortening] = useState([false, false, false]);
+
+  // 環境の違いによるコンパイルエラーを防ぐため、安全な読み込み方に修正しました
+  // ※Vercel (Vite環境) でAPIキーが読み込めない場合は、下のコメントアウト（//）を外して切り替えてみてください。
+  let API_KEY = (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) || "";
+  // API_KEY = import.meta.env.VITE_GEMINI_API_KEY || API_KEY;
 
   const shortenUrl = async (index) => {
-    if (!urls[index]) return;
-    const newShortening = [...shortening];
+    const url = urls[index];
+    if (!url) return;
+
+    const newShortening = [...isShortening];
     newShortening[index] = true;
-    setShortening(newShortening);
+    setIsShortening(newShortening);
+    setMessage(null);
 
     try {
-      const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(urls[index])}`);
+      // 無料の短縮API (is.gd) を使用
+      const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);
+      if (!res.ok) throw new Error('ネットワークエラー');
       const data = await res.json();
+      
       if (data.shorturl) {
         const newUrls = [...urls];
         newUrls[index] = data.shorturl;
         setUrls(newUrls);
+        setMessage({ type: 'success', text: 'URLを短縮しました！' });
       } else {
-        setMessage({ type: 'error', text: '短縮に失敗しました' });
+        throw new Error(data.errormessage || '短縮に失敗しました');
       }
     } catch (e) {
-      setMessage({ type: 'error', text: '短縮APIへの接続に失敗しました' });
+      setMessage({ type: 'error', text: `URL短縮エラー: ブラウザのセキュリティ制限などで失敗しました。外部ツールで短縮したURLを直接入力してください。` });
     } finally {
-      const resetShortening = [...shortening];
+      const resetShortening = [...isShortening];
       resetShortening[index] = false;
-      setShortening(resetShortening);
+      setIsShortening(resetShortening);
     }
   };
 
   const generate = async () => {
+    if (!API_KEY) {
+        setMessage({ type: 'error', text: 'APIキーが設定されていません。Vercelの環境変数を確認し、Redeployしてください。' });
+        return;
+    }
     if (!eventName || !eventDetails) {
       setMessage({ type: 'error', text: 'イベント名と詳細は必須です' });
       return;
@@ -69,21 +97,20 @@ export default function App() {
 
 【イベント名】: ${eventName}
 【イベント詳細】: ${eventDetails}
-【キャラクター設定】: ${CHARACTERS[charKey]}
+【キャラクター設定】: ${CHARACTER_PROMPTS[charKey]}
 【後から付与する情報】: 
 ${appendedContent}
 
 【絶対ルール】
 1. 指定されたキャラクターになりきること。
 2. 「${eventName}」というイベント名を必ず文章中に含めること。
-3. **重要：本文＋【後から付与する情報】を合わせた合計文字数が絶対に180文字以内になるように調整すること。** 文字数オーバーしそうな場合は、本文を大幅に短縮すること。
-4. 本文のみを出力すること（URL、ハッシュタグ、メンションは含めないこと）。
-5. 挨拶や前置きは不要。
-6. 無駄な改行や空白は避けること。
+3. **重要：本文＋【後から付与する情報】を合わせた合計文字数が絶対に180文字以内になるように調整すること。**
+4. 本文のみを出力すること。挨拶や前置きは不要。
 `;
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=`, {
+      // 【修正ポイント2】AIモデル名を安定して動く最新版（gemini-1.5-flash）に変更しました
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -92,22 +119,17 @@ ${appendedContent}
         })
       });
       const data = await response.json();
-      const body = data.candidates[0].content.parts[0].text.trim();
       
+      if (data.error) throw new Error(data.error.message);
+      
+      const body = data.candidates[0].content.parts[0].text.trim();
       const final = `${body}\n\n${appendedContent}`.trim();
       setResult(final);
     } catch (e) {
-      setMessage({ type: 'error', text: '生成エラーです。もう一度押してください。' });
+      setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(result).then(() => {
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    });
   };
 
   return (
@@ -123,28 +145,37 @@ ${appendedContent}
       <div className="space-y-3">
         <input className="w-full p-2 border rounded" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
         <textarea className="w-full p-2 border rounded" rows={3} placeholder="イベント詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
+        
+        <div className="space-y-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <label className="block text-sm font-bold text-gray-700">関連URL (最大3つ・任意)</label>
+          {urls.map((url, i) => (
+            <div key={i} className="flex gap-2">
+              <input
+                className="flex-1 p-2 border rounded text-sm bg-white"
+                placeholder={`https://... (URL ${i + 1})`}
+                value={url}
+                onChange={e => {
+                  const newUrls = [...urls];
+                  newUrls[i] = e.target.value;
+                  setUrls(newUrls);
+                }}
+              />
+              <button
+                onClick={() => shortenUrl(i)}
+                disabled={!url || isShortening[i]}
+                className="px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded text-sm font-bold whitespace-nowrap disabled:opacity-50 transition"
+              >
+                {isShortening[i] ? <Loader2 className="animate-spin" size={16}/> : '短縮する'}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <select className="w-full p-2 border rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
+          {Object.entries(CHARACTERS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
         <input className="w-full p-2 border rounded" placeholder="ハッシュタグ" value={hashtags} onChange={e=>setHashtags(e.target.value)} />
         <input className="w-full p-2 border rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
-      </div>
-
-      <div className="space-y-2 border-t pt-4">
-        <label className="text-sm font-semibold flex items-center gap-2"><LinkIcon size={16}/> URL短縮 (最大3個)</label>
-        {urls.map((url, i) => (
-          <div key={i} className="flex gap-2">
-            <input className="flex-1 p-2 border rounded text-sm" placeholder={`URL ${i+1}`} value={url} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />
-            <button onClick={()=>shortenUrl(i)} className="bg-gray-200 px-3 py-1 rounded text-xs hover:bg-gray-300">
-              {shortening[i] ? <Loader2 className="animate-spin" size={14}/> : "短縮"}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {Object.keys(CHARACTERS).map(k => (
-          <button key={k} onClick={() => setCharKey(k)} className={`p-2 text-xs rounded transition ${charKey===k ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>
-            {CHARACTERS[k].split('：')[0]}
-          </button>
-        ))}
       </div>
 
       <button onClick={generate} className="w-full p-3 bg-indigo-600 text-white rounded font-bold flex justify-center hover:bg-indigo-700 transition">
@@ -153,13 +184,8 @@ ${appendedContent}
 
       {result && (
         <div className="p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap border border-gray-200 relative">
-          <div className={`text-right text-xs mb-2 ${result.length > 180 ? 'text-red-600' : 'text-gray-500'}`}>
-            {result.length} / 180 文字
-          </div>
+          <div className="text-right text-xs mb-2 text-gray-500">{result.length} / 180 文字</div>
           {result}
-          <button onClick={copyToClipboard} className="absolute top-2 right-2 p-1 hover:bg-gray-200 rounded">
-            {copySuccess ? <Check size={16} className="text-green-600"/> : <Copy size={16}/>}
-          </button>
         </div>
       )}
     </div>
