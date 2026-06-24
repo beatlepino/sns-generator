@@ -1,6 +1,25 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 
+const CHARACTERS = {
+  serious: "真面目系", gyaru: "ギャル系", cute: "可愛い系", ojisan: "おじさん系",
+  announcer: "アナウンサー系", friend: "友達キャラ", light: "ノリ軽いキャラ",
+  fan: "ファンキャラ", sexy: "セクシーキャラ", fresh: "さわやかお兄さん系"
+};
+
+const CHARACTER_PROMPTS = {
+  serious: "真面目系：丁寧語で、誠実かつ信頼感のある、少し硬めの文体で告知してください。",
+  gyaru: "ギャル系：明るいテンションで、「〜マジでヤバい！」「〜しよ！」など、若者言葉と絵文字を多用してください。",
+  cute: "可愛い系：語尾を「〜だにゃん」「〜だよっ☆」など可愛くし、ハートや星の絵文字を使ってください。",
+  ojisan: "おじさん系：句読点多め。絵文字は古めのものを使用し、少しお節介で親しみやすい雰囲気で告知してください。",
+  announcer: "アナウンサー系：ニュース番組の告知のように、冷静かつハキハキとした、簡潔で分かりやすい文体で伝えてください。",
+  friend: "友達キャラ：タメ口で、親しみやすく「ねえねえ、これ見て！」という距離感の文体で告知してください。",
+  light: "ノリ軽いキャラ：サクッと「これアツい！」「絶対行ったほうがいい！」みたいな軽いノリで告知してください。",
+  fan: "ファンキャラ：熱烈なファン目線で、「絶対見逃せない！」「やばい最高！」という興奮気味な文体で告知してください。",
+  sexy: "セクシーキャラ：少し大人っぽく、落ち着いた艶やかな雰囲気で、誘惑するような文体で告知してください。",
+  fresh: "さわやかお兄さん系：爽やかで親しみやすく、誰に対しても好印象を与えるような、明るくポジティブな文体で告知してください。"
+};
+
 export default function App() {
   const [eventName, setEventName] = useState('');
   const [eventDetails, setEventDetails] = useState('');
@@ -13,8 +32,9 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [isShortening, setIsShortening] = useState([false, false, false]);
 
-  // ビルド環境で警告が出ないよう、process.envのみを参照する安全な取得方法に変更
-  const API_KEY = process.env.VITE_GEMINI_API_KEY || '';
+  // ★ここでAPIキーを取得します。Vercel設定が上手くいかない場合は、
+  // "" の中に直接キー（AIza...）を貼り付けて保存し、再デプロイしてください。
+  const API_KEY = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || "";
 
   const shortenUrl = async (index) => {
     const url = urls[index];
@@ -31,7 +51,7 @@ export default function App() {
         setUrls(newUrls);
       }
     } catch (e) {
-      setMessage({ type: 'error', text: '短縮エラー' });
+      setMessage({ type: 'error', text: '短縮失敗' });
     } finally {
       const reset = [...isShortening];
       reset[index] = false;
@@ -41,12 +61,13 @@ export default function App() {
 
   const generate = async () => {
     if (!API_KEY) {
-      setMessage({ type: 'error', text: 'APIキーが環境変数に設定されていません。' });
+      setMessage({ type: 'error', text: 'APIキーが取得できません。環境変数を確認してください。' });
       return;
     }
     setIsLoading(true);
+    setResult('');
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `イベント:${eventName}\n詳細:${eventDetails}\n付随情報:${appended}\n告知文を作成してください。`;
+    const prompt = `イベント:${eventName}\n詳細:${eventDetails}\n設定:${CHARACTER_PROMPTS[charKey]}\n付随情報:${appended}\n告知文を作成してください。`;
 
     try {
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent', {
@@ -55,10 +76,10 @@ export default function App() {
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       const data = await response.json();
-      const body = data.candidates[0].content.parts[0].text;
-      setResult(`${body}\n\n${appended}`);
+      if (!data.candidates) throw new Error("APIレスポンスエラー");
+      setResult(`${data.candidates[0].content.parts[0].text}\n\n${appended}`);
     } catch (e) {
-      setMessage({ type: 'error', text: '生成失敗: ' + e.message });
+      setMessage({ type: 'error', text: '生成エラー: ' + e.message });
     } finally {
       setIsLoading(false);
     }
