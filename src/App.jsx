@@ -38,8 +38,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
-  // 環境変数の取得方法を修正
-  const API_KEY = typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : import.meta.env?.VITE_GEMINI_API_KEY;
+  // コンパイルエラーを避けるため、環境変数を安全に取得する構成に変更
+  const API_KEY = process.env.VITE_GEMINI_API_KEY || '';
 
   const generate = async () => {
     if (!API_KEY) {
@@ -56,7 +56,15 @@ export default function App() {
     setResult('');
 
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `あなたはSNS投稿のプロです。イベント名:${eventName}, 詳細:${eventDetails}, 設定:${CHARACTER_PROMPTS[charKey]}, 付随情報:${appended}。180文字以内の告知文を作成してください。本文のみ出力してください。`;
+    
+    const prompt = `あなたはSNS投稿のプロです。以下の情報を元に180文字以内で告知文を作成してください。
+【必須項目】
+1.イベント名: ${eventName}
+2.詳細: ${eventDetails}
+3.キャラクター: ${CHARACTER_PROMPTS[charKey]}
+4.【付随情報】: 以下の情報を必ず投稿の最後にそのまま含めてください:
+${appended}
+`;
 
     try {
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=' + API_KEY, {
@@ -65,32 +73,28 @@ export default function App() {
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error('APIから無効なデータが返されました（キーの設定を確認してください）');
-      }
-
-      if (!response.ok) throw new Error(data.error?.message || '生成失敗');
+      const data = await response.json();
+      if (!response.ok) throw new Error('生成失敗');
       
-      const body = data.candidates[0].content.parts[0].text.trim();
-      setResult(`${body}\n\n${appended}`.trim());
+      const responseText = data.candidates[0].content.parts[0].text;
+      setResult(responseText);
     } catch (e) {
-      setMessage({ type: 'error', text: e.message });
+      setMessage({ type: 'error', text: '生成エラーが発生しました' });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-4 bg-white shadow-md rounded-lg mt-10">
-      <h1 className="text-xl font-bold mb-4 flex items-center gap-2"><Sparkles className="text-indigo-500"/> SNS投稿ジェネレーター</h1>
-      {message && <div className="text-red-500 text-sm mb-4 bg-red-50 p-2 rounded">{message.text}</div>}
+    <div className="max-w-md mx-auto p-4 bg-white shadow-lg rounded-xl border border-gray-200">
+      <h1 className="text-xl font-bold mb-4 flex items-center gap-2"><Sparkles className="text-indigo-500"/> SNS投稿作成</h1>
+      {message && <div className="text-red-500 text-sm mb-4 p-2 bg-red-50 rounded">{message.text}</div>}
       <div className="space-y-3">
         <input className="w-full border p-2 rounded" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
         <textarea className="w-full border p-2 rounded" rows={3} placeholder="イベント詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
+        {urls.map((url, i) => <input key={i} className="w-full border p-2 rounded text-sm" placeholder={`URL ${i+1}`} value={url} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />)}
+        <input className="w-full border p-2 rounded" placeholder="ハッシュタグ" value={hashtags} onChange={e=>setHashtags(e.target.value)} />
+        <input className="w-full border p-2 rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
         <select className="w-full border p-2 rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
           {Object.entries(CHARACTERS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
         </select>
@@ -98,7 +102,7 @@ export default function App() {
           {isLoading ? '生成中...' : '生成する'}
         </button>
       </div>
-      {result && <div className="mt-4 p-3 bg-gray-100 whitespace-pre-wrap text-sm rounded">{result}</div>}
+      {result && <div className="mt-4 p-3 bg-gray-50 whitespace-pre-wrap text-sm rounded border">{result}</div>}
     </div>
   );
 }
