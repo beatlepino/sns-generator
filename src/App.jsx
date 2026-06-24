@@ -39,8 +39,7 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [isShortening, setIsShortening] = useState([false, false, false]);
 
-  // Vercelで設定した環境変数（APIキー）を読み込む
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  const API_KEY = ""; // Vercelにアップロードする際は、ここの "" の中に取得したAPIキー（AQ...）を直接貼り付けてください
 
   const shortenUrl = async (index) => {
     const url = urls[index];
@@ -78,6 +77,7 @@ export default function App() {
       setMessage({ type: 'error', text: 'APIキーが設定されていません。Vercelの環境変数を確認し、Redeployしてください。' });
       return;
     }
+
     if (!eventName || !eventDetails) {
       setMessage({ type: 'error', text: 'イベント名と詳細は必須です' });
       return;
@@ -104,14 +104,17 @@ ${appendedContent}
     let success = false;
     let responseData = null;
     let lastError = null;
-    // リトライを減らし、すぐにエラーを検知できるように変更
     const delays = [1000, 2000];
 
     for (let i = 0; i <= delays.length; i++) {
       try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`, {
+        // 新しい形式のAPIキーに対応するため、URLではなくヘッダー(x-goog-api-key)でキーを送信します
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': API_KEY 
+          },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { temperature: 0.7 }
@@ -121,9 +124,8 @@ ${appendedContent}
         
         if (!response.ok || data.error) {
           const errMsg = data.error?.message || `HTTP ${response.status}`;
-          // 400番台エラー（APIキー間違い等）はリトライせずにすぐエラーを出す
           if (response.status >= 400 && response.status < 500) {
-            lastError = new Error(`APIキーが無効、または設定エラーです: ${errMsg}`);
+            lastError = new Error(`APIキーエラー: ${errMsg}`);
             break;
           }
           throw new Error(errMsg);
@@ -146,7 +148,6 @@ ${appendedContent}
       const final = `${body}\n\n${appendedContent}`.trim();
       setResult(final);
     } catch (e) {
-      // エラーの理由を画面に表示する
       setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
     } finally {
       setIsLoading(false);
