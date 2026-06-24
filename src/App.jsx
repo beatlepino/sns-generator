@@ -39,10 +39,8 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [isShortening, setIsShortening] = useState([false, false, false]);
 
-  // 環境の違いによるコンパイルエラーを防ぐため、安全な読み込み方に修正しました
-  // ※Vercel (Vite環境) でAPIキーが読み込めない場合は、下のコメントアウト（//）を外して切り替えてみてください。
-  let API_KEY = (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) || "";
-  // API_KEY = import.meta.env.VITE_GEMINI_API_KEY || API_KEY;
+  // Vercelで設定した環境変数（APIキー）を読み込む
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
   const shortenUrl = async (index) => {
     const url = urls[index];
@@ -54,7 +52,6 @@ export default function App() {
     setMessage(null);
 
     try {
-      // 無料の短縮API (is.gd) を使用
       const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);
       if (!res.ok) throw new Error('ネットワークエラー');
       const data = await res.json();
@@ -78,8 +75,8 @@ export default function App() {
 
   const generate = async () => {
     if (!API_KEY) {
-        setMessage({ type: 'error', text: 'APIキーが設定されていません。Vercelの環境変数を確認し、Redeployしてください。' });
-        return;
+      setMessage({ type: 'error', text: 'APIキーが設定されていません。Vercelの環境変数を確認し、Redeployしてください。' });
+      return;
     }
     if (!eventName || !eventDetails) {
       setMessage({ type: 'error', text: 'イベント名と詳細は必須です' });
@@ -108,25 +105,43 @@ ${appendedContent}
 4. 本文のみを出力すること。挨拶や前置きは不要。
 `;
 
+    let success = false;
+    let responseData = null;
+    let lastError = null;
+    const delays = [1000, 2000, 4000, 8000, 16000];
+
+    for (let i = 0; i <= delays.length; i++) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7 }
+          })
+        });
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error.message);
+        
+        responseData = data;
+        success = true;
+        break;
+      } catch (e) {
+        lastError = e;
+        if (i < delays.length) {
+          await new Promise(resolve => setTimeout(resolve, delays[i]));
+        }
+      }
+    }
+
     try {
-      // 【修正ポイント2】AIモデル名を安定して動く最新版（gemini-1.5-flash）に変更しました
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7 }
-        })
-      });
-      const data = await response.json();
-      
-      if (data.error) throw new Error(data.error.message);
-      
-      const body = data.candidates[0].content.parts[0].text.trim();
+      if (!success || !responseData) throw lastError;
+      const body = responseData.candidates[0].content.parts[0].text.trim();
       const final = `${body}\n\n${appendedContent}`.trim();
       setResult(final);
     } catch (e) {
-      setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
+      setMessage({ type: 'error', text: '生成エラー: サーバーとの通信に失敗しました。' });
     } finally {
       setIsLoading(false);
     }
