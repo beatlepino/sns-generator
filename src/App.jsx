@@ -34,7 +34,7 @@ export default function App() {
 
   // ★ここでAPIキーを取得します。Vercel設定が上手くいかない場合は、
   // "" の中に直接キー（AIza...）を貼り付けて保存し、再デプロイしてください。
-  const API_KEY = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || "";
+  const API_KEY = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || "AQ.Ab8RN6LW0kU7oamHUQAfN5XMz1FQX76kjlFqHneVg5p4I5-PZA";
 
   const shortenUrl = async (index) => {
     const url = urls[index];
