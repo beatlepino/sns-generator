@@ -1,52 +1,4 @@
-import React, { useState } from 'react';
-import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
-
-const CHARACTERS = {
-serious: "真面目系",
-gyaru: "ギャル系",
-cute: "可愛い系",
-ojisan: "おじさん系",
-announcer: "アナウンサー系",
-friend: "友達キャラ",
-light: "ノリ軽いキャラ",
-fan: "ファンキャラ",
-sexy: "セクシーキャラ",
-fresh: "さわやかお兄さん系"
-};
-
-const CHARACTER_PROMPTS = {
-serious: "真面目系：丁寧語で、誠実かつ信頼感のある、少し硬めの文体で告知してください。",
-gyaru: "ギャル系：明るいテンションで、「〜マジでヤバい！」「〜しよ！」など、若者言葉と絵文字を多用してください。",
-cute: "可愛い系：語尾を「〜だにゃん」「〜だよっ☆」など可愛くし、ハートや星の絵文字を使ってください。",
-ojisan: "おじさん系：句読点多め。絵文字は古めのものを使用し、少しお節介で親しみやすい雰囲気で告知してください。",
-announcer: "アナウンサー系：ニュース番組の告知のように、冷静かつハキハキとした、簡潔で分かりやすい文体で伝えてください。",
-friend: "友達キャラ：タメ口で、親しみやすく「ねえねえ、これ見て！」という距離感の文体で告知してください。",
-light: "ノリ軽いキャラ：サクッと「これアツい！」「絶対行ったほうがいい！」みたいな軽いノリで告知してください。",
-fan: "ファンキャラ：熱烈なファン目線で、「絶対見逃せない！」「やばい最高！」という興奮気味な文体で告知してください。",
-sexy: "セクシーキャラ：少し大人っぽく、落ち着いた艶やかな雰囲気で、誘惑するような文体で告知してください。",
-fresh: "さわやかお兄さん系：爽やかで親しみやすく、誰に対しても好印象を与えるような、明るくポジティブな文体で告知してください。"
-};
-
-export default function App() {
-const [eventName, setEventName] = useState('');
-const [eventDetails, setEventDetails] = useState('');
-const [urls, setUrls] = useState(['', '', '']);
-const [hashtags, setHashtags] = useState('');
-const [mention, setMention] = useState('');
-const [charKey, setCharKey] = useState('serious');
-const [result, setResult] = useState('');
-const [isLoading, setIsLoading] = useState(false);
-const [message, setMessage] = useState(null);
-const [isShortening, setIsShortening] = useState([false, false, false]);
-
-// Vercel上の環境変数を正しく読み込む記述（ここが勝手に消えないように保護しました）
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-const shortenUrl = async (index) => {
-const url = urls[index];
-if (!url) return;
-
-const newShortening = [...isShortening];
+import React, { useState } from 'react';import { Sparkles, Loader2, AlertCircle } from 'lucide-react';const CHARACTERS = {serious: "真面目系",gyaru: "ギャル系",cute: "可愛い系",ojisan: "おじさん系",announcer: "アナウンサー系",friend: "友達キャラ",light: "ノリ軽いキャラ",fan: "ファンキャラ",sexy: "セクシーキャラ",fresh: "さわやかお兄さん系"};const CHARACTER_PROMPTS = {serious: "真面目系：丁寧語で、誠実かつ信頼感のある、少し硬めの文体で告知してください。",gyaru: "ギャル系：明るいテンションで、「〜マジでヤバい！」「〜しよ！」など、若者言葉と絵文字を多用してください。",cute: "可愛い系：語尾を「〜だにゃん」「〜だよっ☆」など可愛くし、ハートや星の絵文字を使ってください。",ojisan: "おじさん系：句読点多め。絵文字は古めのものを使用し、少しお節介で親しみやすい雰囲気で告知してください。",announcer: "アナウンサー系：ニュース番組の告知のように、冷静かつハキハキとした、簡潔で分かりやすい文体で伝えてください。",friend: "友達キャラ：タメ口で、親しみやすく「ねえねえ、これ見て！」という距離感の文体で告知してください。",light: "ノリ軽いキャラ：サクッと「これアツい！」「絶対行ったほうがいい！」みたいな軽いノリで告知してください。",fan: "ファンキャラ：熱烈なファン目線で、「絶対見逃せない！」「やばい最高！」という興奮気味な文体で告知してください。",sexy: "セクシーキャラ：少し大人っぽく、落ち着いた艶やかな雰囲気で、誘惑するような文体で告知してください。",fresh: "さわやかお兄さん系：爽やかで親しみやすく、誰に対しても好印象を与えるような、明るくポジティブな文体で告知してください。"};export default function App() {const [eventName, setEventName] = useState('');const [eventDetails, setEventDetails] = useState('');const [urls, setUrls] = useState(['', '', '']);const [hashtags, setHashtags] = useState('');const [mention, setMention] = useState('');const [charKey, setCharKey] = useState('serious');const [result, setResult] = useState('');const [isLoading, setIsLoading] = useState(false);const [message, setMessage] = useState(null);const [isShortening, setIsShortening] = useState([false, false, false]);// Vercel上の環境変数を正しく読み込む記述（ここが勝手に消えないように保護しました）const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;const shortenUrl = async (index) => {const url = urls[index];if (!url) return;const newShortening = [...isShortening];
 newShortening[index] = true;
 setIsShortening(newShortening);
 setMessage(null);
@@ -71,17 +23,7 @@ try {
   resetShortening[index] = false;
   setIsShortening(resetShortening);
 }
-
-
-};
-
-const generate = async () => {
-if (!API_KEY) {
-setMessage({ type: 'error', text: 'APIキーが設定されていません。Vercelの環境変数を確認し、Redeployしてください。' });
-return;
-}
-
-if (!eventName || !eventDetails) {
+};const generate = async () => {if (!API_KEY) {setMessage({ type: 'error', text: 'APIキーが設定されていません。Vercelの環境変数を確認し、Redeployしてください。' });return;}if (!eventName || !eventDetails) {
   setMessage({ type: 'error', text: 'イベント名と詳細は必須です' });
   return;
 }
@@ -93,44 +35,7 @@ setMessage(null);
 const appendedContent = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
 
 const prompt = `あなたはSNS投稿作成のプロです。以下のイベント情報を元に、X（Twitter）の告知本文を作成してください。
-
-
-【イベント名】: ${eventName}
-【イベント詳細】: ${eventDetails}
-【キャラクター設定】: ${CHARACTER_PROMPTS[charKey]}
-【後から付与する情報】:
-${appendedContent}
-【絶対ルール】
-
-指定されたキャラクターになりきること。
-
-「${eventName}」というイベント名を必ず文章中に含めること。
-
-重要：本文＋【後から付与する情報】を合わせた合計文字数が絶対に180文字以内になるように調整すること。
-
-本文のみを出力すること。挨拶や前置きは不要。`;
-
-let success = false;
-let responseData = null;
-let lastError = null;
-const delays = [1000, 2000];
-
-for (let i = 0; i <= delays.length; i++) {
-try {
-const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent', {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json',
-'x-goog-api-key': API_KEY
-},
-body: JSON.stringify({
-contents: [{ parts: [{ text: prompt }] }],
-generationConfig: { temperature: 0.7 }
-})
-});
-const data = await response.json();
-
- if (!response.ok || data.error) {
+【イベント名】: ${eventName}【イベント詳細】: ${eventDetails}【キャラクター設定】: ${CHARACTER_PROMPTS[charKey]}【後から付与する情報】:${appendedContent}【絶対ルール】指定されたキャラクターになりきること。「${eventName}」というイベント名を必ず文章中に含めること。重要：本文＋【後から付与する情報】を合わせた合計文字数が絶対に180文字以内になるように調整すること。本文のみを出力すること。挨拶や前置きは不要。`;let success = false;let responseData = null;let lastError = null;const delays = [1000, 2000];for (let i = 0; i <= delays.length; i++) {try {const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent', {method: 'POST',headers: {'Content-Type': 'application/json','x-goog-api-key': API_KEY},body: JSON.stringify({contents: [{ parts: [{ text: prompt }] }],generationConfig: { temperature: 0.7 }})});const data = await response.json(); if (!response.ok || data.error) {
    const errMsg = data.error?.message || `HTTP ${response.status}`;
    if (response.status >= 400 && response.status < 500) {
      lastError = new Error(`APIキーエラー: ${errMsg}`);
@@ -142,33 +47,7 @@ const data = await response.json();
  responseData = data;
  success = true;
  break;
-
-
-} catch (e) {
-lastError = e;
-if (i < delays.length) {
-await new Promise(resolve => setTimeout(resolve, delays[i]));
-}
-}
-}
-
-try {
-if (!success || !responseData) throw lastError;
-const body = responseData.candidates[0].content.parts[0].text.trim();
-const final = ${body}\n\n${appendedContent}.trim();
-setResult(final);
-} catch (e) {
-setMessage({ type: 'error', text: 生成エラー: ${e.message} });
-} finally {
-setIsLoading(false);
-}
-};
-
-return (
-
- SNS投稿ジェネレーター
-
-  {message && (
+} catch (e) {lastError = e;if (i < delays.length) {await new Promise(resolve => setTimeout(resolve, delays[i]));}}}try {if (!success || !responseData) throw lastError;const body = responseData.candidates[0].content.parts[0].text.trim();const final = ${body}\n\n${appendedContent}.trim();setResult(final);} catch (e) {setMessage({ type: 'error', text: 生成エラー: ${e.message} });} finally {setIsLoading(false);}};return ( SNS投稿ジェネレーター  {message && (
     <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${message.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
       <AlertCircle className="flex-shrink-0" size={16}/> 
       <span className="break-all">{message.text}</span>
@@ -222,7 +101,4 @@ return (
     </div>
   )}
 </div>
-
-
-);
-}
+);}
