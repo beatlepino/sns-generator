@@ -2,9 +2,16 @@ import React, { useState } from 'react';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 
 const CHARACTERS = {
-  serious: "真面目系", gyaru: "ギャル系", cute: "可愛い系", ojisan: "おじさん系",
-  announcer: "アナウンサー系", friend: "友達キャラ", light: "ノリ軽いキャラ",
-  fan: "ファンキャラ", sexy: "セクシーキャラ", fresh: "さわやかお兄さん系"
+  serious: "真面目系",
+  gyaru: "ギャル系",
+  cute: "可愛い系",
+  ojisan: "おじさん系",
+  announcer: "アナウンサー系",
+  friend: "友達キャラ",
+  light: "ノリ軽いキャラ",
+  fan: "ファンキャラ",
+  sexy: "セクシーキャラ",
+  fresh: "さわやかお兄さん系"
 };
 
 const CHARACTER_PROMPTS = {
@@ -32,8 +39,6 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [isShortening, setIsShortening] = useState([false, false, false]);
 
-  // ★ここでAPIキーを取得します。Vercel設定が上手くいかない場合は、
-  // "" の中に直接キー（AIza...）を貼り付けて保存し、再デプロイしてください。
   const API_KEY = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || "AQ.Ab8RN6LW0kU7oamHUQAfN5XMz1FQX76kjlFqHneVg5p4I5-PZA";
 
   const shortenUrl = async (index) => {
@@ -60,14 +65,19 @@ export default function App() {
   };
 
   const generate = async () => {
-    if (!API_KEY) {
-      setMessage({ type: 'error', text: 'APIキーが取得できません。環境変数を確認してください。' });
+    if (!API_KEY || API_KEY === "ここにAPIキーを貼り付けてください") {
+      setMessage({ type: 'error', text: 'APIキーが設定されていません。' });
       return;
     }
     setIsLoading(true);
     setResult('');
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `イベント:${eventName}\n詳細:${eventDetails}\n設定:${CHARACTER_PROMPTS[charKey]}\n付随情報:${appended}\n告知文を作成してください。`;
+    const prompt = `以下の情報を元に、SNS告知文を作成してください。
+【イベント名】: ${eventName}
+【詳細】: ${eventDetails}
+【キャラクター】: ${CHARACTER_PROMPTS[charKey]}
+【付随情報】: ${appended}
+本文のみを180文字以内で出力してください。`;
 
     try {
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent', {
@@ -76,8 +86,11 @@ export default function App() {
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       const data = await response.json();
-      if (!data.candidates) throw new Error("APIレスポンスエラー");
-      setResult(`${data.candidates[0].content.parts[0].text}\n\n${appended}`);
+      if (data.candidates && data.candidates[0].content) {
+        setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`);
+      } else {
+        throw new Error("応答形式エラー");
+      }
     } catch (e) {
       setMessage({ type: 'error', text: '生成エラー: ' + e.message });
     } finally {
@@ -98,6 +111,9 @@ export default function App() {
             <button onClick={()=>shortenUrl(i)} className="bg-indigo-100 px-3 rounded text-sm hover:bg-indigo-200">{isShortening[i] ? '...' : '短縮'}</button>
           </div>
         ))}
+        <select className="w-full p-2 border rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
+          {Object.entries(CHARACTERS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
         <input className="w-full p-2 border rounded" placeholder="ハッシュタグ" value={hashtags} onChange={e=>setHashtags(e.target.value)} />
         <input className="w-full p-2 border rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
         <button onClick={generate} disabled={isLoading} className="w-full p-3 bg-indigo-600 text-white rounded font-bold">{isLoading ? '生成中...' : '生成する'}</button>
