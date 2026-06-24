@@ -33,9 +33,6 @@ export default function App() {
 
   const shortenUrl = async (index) => {
     if (!urls[index]) return;
-    const newShortening = [...isShortening];
-    newShortening[index] = true;
-    setIsShortening(newShortening);
     try {
       const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(urls[index])}`);
       const data = await res.json();
@@ -45,19 +42,20 @@ export default function App() {
         setUrls(newUrls);
       }
     } catch (e) { setMessage({ type: 'error', text: '短縮失敗' }); }
-    finally { const reset = [...isShortening]; reset[index] = false; setIsShortening(reset); }
   };
 
   const generate = async () => {
     if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが未設定です。' }); return; }
     setIsLoading(true);
     setResult('');
+    
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `イベント「${eventName}」の告知文を${CHARACTER_PROMPTS[charKey]}で作成してください。\n詳細:${eventDetails}\n${appended}\n※180文字以内、挨拶不要、本文のみ出力。`;
+    const prompt = `あなたはSNS投稿作成のプロです。以下の情報を元にSNSの告知文を180文字以内で作成してください。挨拶不要、本文のみ出力。\n\nイベント名:${eventName}\n詳細:${eventDetails}\n設定:${CHARACTER_PROMPTS[charKey]}\n付随情報:${appended}`;
 
     try {
-      // 認証をURLパラメータで送る形式に固定
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      // 最も汎用的なエンドポイントに修正
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -66,35 +64,34 @@ export default function App() {
       const data = await response.json();
       
       if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`.trim());
+        setResult(data.candidates[0].content.parts[0].text.trim());
       } else {
-        // エラー詳細を表示
-        throw new Error(data.error?.message || "不明なAPIエラー");
+        throw new Error(data.error?.message || "API応答エラー");
       }
     } catch (e) {
-      setMessage({ type: 'error', text: `接続エラー: ${e.message}` });
+      setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl border border-gray-200 space-y-4">
+    <div className="max-w-md mx-auto p-6 space-y-4 bg-white rounded-xl shadow-lg">
       <h1 className="text-xl font-bold">SNS投稿ジェネレーター</h1>
       {message && <div className="p-2 bg-red-50 text-red-600 text-sm rounded">{message.text}</div>}
       <input className="w-full p-2 border rounded" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
       <textarea className="w-full p-2 border rounded" rows={3} placeholder="イベント詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
       {urls.map((u, i) => (
         <div key={i} className="flex gap-2">
-          <input className="flex-1 p-2 border rounded text-sm" placeholder={`URL ${i+1}`} value={u} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />
-          <button onClick={()=>shortenUrl(i)} className="bg-indigo-100 px-3 rounded text-sm">{isShortening[i] ? '...' : '短縮'}</button>
+          <input className="flex-1 p-2 border rounded text-sm" value={u} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />
+          <button onClick={()=>shortenUrl(i)} className="bg-indigo-100 px-3 rounded">短縮</button>
         </div>
       ))}
       <select className="w-full p-2 border rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
         {Object.entries(CHARACTERS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
       </select>
       <button onClick={generate} disabled={isLoading} className="w-full p-3 bg-indigo-600 text-white rounded font-bold">{isLoading ? '生成中...' : '生成する'}</button>
-      {result && <div className="p-4 bg-gray-50 rounded border whitespace-pre-wrap text-sm">{result}</div>}
+      {result && <div className="p-4 bg-gray-50 rounded text-sm">{result}</div>}
     </div>
   );
 }
