@@ -9,12 +9,18 @@ const CHARACTERS = {
 };
 
 const CHARACTER_PROMPTS = {
-  serious: "真面目系：丁寧語で誠実な告知。", gyaru: "ギャル系：絵文字多用でハイテンションな告知。",
-  cute: "可愛い系：語尾を可愛くしハートや星を使用。", ojisan: "おじさん系：句読点多めでお節介な告知。",
-  announcer: "アナウンサー系：冷静かつハキハキとした告知。", friend: "友達キャラ：タメ口で親しみやすい告知。",
-  light: "ノリ軽いキャラ：アツい軽いノリの告知。", fan: "ファンキャラ：熱烈なファン目線の告知。",
-  sexy: "セクシーキャラ：大人っぽく誘惑するような告知。", fresh: "さわやかお兄さん系：明るくポジティブな告知。",
-  horror: "ホラー系：ゾクッとする怪談風の告知。", johnnys: "ジャニオタ系：熱狂的なオタク用語で告知。"
+  serious: "真面目系：丁寧語で、誠実かつ信頼感のある、少し硬めの文体で告知してください。",
+  gyaru: "ギャル系：明るいテンションで、「〜マジでヤバい！」「〜しよ！」など、若者言葉と絵文字を多用してください。",
+  cute: "可愛い系：語尾を「〜だにゃん」「〜だよっ☆」など可愛くし、ハートや星の絵文字を使ってください。",
+  ojisan: "おじさん系：句読点多め。絵文字は古めのものを使用し、少しお節介で親しみやすい雰囲気で告知してください。",
+  announcer: "アナウンサー系：ニュース番組の告知のように、冷静かつハキハキとした、簡潔で分かりやすい文体で伝えてください。",
+  friend: "友達キャラ：タメ口で、親しみやすく「ねえねえ、これ見て！」という距離感の文体で告知してください。",
+  light: "ノリ軽いキャラ：サクッと「これアツい！」「絶対行ったほうがいい！」みたいな軽いノリで告知してください。",
+  fan: "ファンキャラ：熱烈なファン目線で、「絶対見逃せない！」「やばい最高！」という興奮気味な文体で告知してください。",
+  sexy: "セクシーキャラ：少し大人っぽく、落ち着いた艶やかな雰囲気で、誘惑するような文体で告知してください。",
+  fresh: "さわやかお兄さん系：爽やかで親しみやすく、誰に対しても好印象を与えるような、明るくポジティブな文体で告知してください。",
+  horror: "ホラー系：ゾクッとする怪談風の告知。",
+  johnnys: "ジャニオタ系：熱狂的なオタク用語で告知。"
 };
 
 export default function App() {
@@ -31,28 +37,47 @@ export default function App() {
 
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
+  const shortenUrl = async (index) => {
+    const url = urls[index];
+    if (!url) return;
+    const newShortening = [...isShortening];
+    newShortening[index] = true;
+    setIsShortening(newShortening);
+    try {
+      const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (data.shorturl) {
+        const newUrls = [...urls];
+        newUrls[index] = data.shorturl;
+        setUrls(newUrls);
+      }
+    } catch (e) { setMessage({ type: 'error', text: '短縮失敗' }); }
+    finally { const reset = [...isShortening]; reset[index] = false; setIsShortening(reset); }
+  };
+
   const generate = async () => {
-    if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが未設定です。' }); return; }
+    if (!API_KEY) { setMessage({ type: 'error', text: 'APIキーが設定されていません。' }); return; }
     setIsLoading(true);
     setResult('');
     
-    const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `あなたはSNS投稿作成のプロです。イベント「${eventName}」の告知文を${CHARACTER_PROMPTS[charKey]}で180文字以内で作成してください。挨拶不要、本文のみ出力。\n詳細:${eventDetails}\n付随情報:${appended}`;
+    const appendedContent = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
+    const prompt = `あなたはSNS投稿作成のプロです。以下のイベント情報を元に、X（Twitter）告知本文を作成してください。\nイベント名: ${eventName}\n詳細: ${eventDetails}\n設定: ${CHARACTER_PROMPTS[charKey]}\n付随情報: ${appendedContent}\n※合計180文字以内、挨拶不要、本文のみ出力。`;
 
     try {
-      // 最新かつ最も安定した gemini-2.0-flash を使用します
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
-      const response = await fetch(url, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': API_KEY
+        },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       
       const data = await response.json();
       if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`.trim());
+        setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appendedContent}`.trim());
       } else {
-        throw new Error(data.error?.message || "モデルが指定できませんでした");
+        throw new Error(data.error?.message || "生成エラー");
       }
     } catch (e) {
       setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
@@ -63,10 +88,18 @@ export default function App() {
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-4 bg-white rounded-xl shadow-lg border">
-      <h1 className="text-xl font-bold">SNS投稿ジェネレーター</h1>
+      <h1 className="text-xl font-bold flex items-center gap-2"><Sparkles size={20}/> SNS投稿ジェネレーター</h1>
       {message && <div className="p-2 bg-red-50 text-red-600 text-sm rounded">{message.text}</div>}
       <input className="w-full p-2 border rounded" placeholder="イベント名" value={eventName} onChange={e=>setEventName(e.target.value)} />
       <textarea className="w-full p-2 border rounded" rows={3} placeholder="イベント詳細" value={eventDetails} onChange={e=>setEventDetails(e.target.value)} />
+      {urls.map((u, i) => (
+        <div key={i} className="flex gap-2">
+          <input className="flex-1 p-2 border rounded text-sm" placeholder={`URL ${i+1}`} value={u} onChange={e=>{const n=[...urls]; n[i]=e.target.value; setUrls(n)}} />
+          <button onClick={()=>shortenUrl(i)} className="bg-indigo-100 px-3 rounded text-sm">{isShortening[i] ? '...' : '短縮'}</button>
+        </div>
+      ))}
+      <input className="w-full p-2 border rounded" placeholder="ハッシュタグ" value={hashtags} onChange={e=>setHashtags(e.target.value)} />
+      <input className="w-full p-2 border rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
       <select className="w-full p-2 border rounded" value={charKey} onChange={e=>setCharKey(e.target.value)}>
         {Object.entries(CHARACTERS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
       </select>
