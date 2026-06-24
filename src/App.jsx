@@ -65,7 +65,7 @@ export default function App() {
         throw new Error(data.errormessage || '短縮に失敗しました');
       }
     } catch (e) {
-      setMessage({ type: 'error', text: `URL短縮エラー: ブラウザのセキュリティ制限などで失敗しました。外部ツールで短縮したURLを直接入力してください。` });
+      setMessage({ type: 'error', text: `URL短縮エラー: ブラウザのセキュリティ制限などで失敗しました。` });
     } finally {
       const resetShortening = [...isShortening];
       resetShortening[index] = false;
@@ -89,26 +89,23 @@ export default function App() {
 
     const appendedContent = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
 
-    const prompt = `
-あなたはSNS投稿作成のプロです。以下のイベント情報を元に、X（Twitter）の告知本文を作成してください。
-
+    const prompt = `あなたはSNS投稿作成のプロです。以下のイベント情報を元に、X（Twitter）の告知本文を作成してください。
 【イベント名】: ${eventName}
 【イベント詳細】: ${eventDetails}
 【キャラクター設定】: ${CHARACTER_PROMPTS[charKey]}
 【後から付与する情報】: 
 ${appendedContent}
-
 【絶対ルール】
 1. 指定されたキャラクターになりきること。
 2. 「${eventName}」というイベント名を必ず文章中に含めること。
 3. **重要：本文＋【後から付与する情報】を合わせた合計文字数が絶対に180文字以内になるように調整すること。**
-4. 本文のみを出力すること。挨拶や前置きは不要。
-`;
+4. 本文のみを出力すること。挨拶や前置きは不要。`;
 
     let success = false;
     let responseData = null;
     let lastError = null;
-    const delays = [1000, 2000, 4000, 8000, 16000];
+    // リトライを減らし、すぐにエラーを検知できるように変更
+    const delays = [1000, 2000];
 
     for (let i = 0; i <= delays.length; i++) {
       try {
@@ -122,7 +119,15 @@ ${appendedContent}
         });
         const data = await response.json();
         
-        if (data.error) throw new Error(data.error.message);
+        if (!response.ok || data.error) {
+          const errMsg = data.error?.message || `HTTP ${response.status}`;
+          // 400番台エラー（APIキー間違い等）はリトライせずにすぐエラーを出す
+          if (response.status >= 400 && response.status < 500) {
+            lastError = new Error(`APIキーが無効、または設定エラーです: ${errMsg}`);
+            break;
+          }
+          throw new Error(errMsg);
+        }
         
         responseData = data;
         success = true;
@@ -141,7 +146,8 @@ ${appendedContent}
       const final = `${body}\n\n${appendedContent}`.trim();
       setResult(final);
     } catch (e) {
-      setMessage({ type: 'error', text: '生成エラー: サーバーとの通信に失敗しました。' });
+      // エラーの理由を画面に表示する
+      setMessage({ type: 'error', text: `生成エラー: ${e.message}` });
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +159,8 @@ ${appendedContent}
       
       {message && (
         <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${message.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-          <AlertCircle size={16}/> {message.text}
+          <AlertCircle className="flex-shrink-0" size={16}/> 
+          <span className="break-all">{message.text}</span>
         </div>
       )}
 
@@ -193,7 +200,7 @@ ${appendedContent}
         <input className="w-full p-2 border rounded" placeholder="@メンション" value={mention} onChange={e=>setMention(e.target.value)} />
       </div>
 
-      <button onClick={generate} className="w-full p-3 bg-indigo-600 text-white rounded font-bold flex justify-center hover:bg-indigo-700 transition">
+      <button onClick={generate} disabled={isLoading} className="w-full p-3 bg-indigo-600 text-white rounded font-bold flex justify-center hover:bg-indigo-700 transition disabled:opacity-50">
         {isLoading ? <Loader2 className="animate-spin"/> : "投稿文を生成する"}
       </button>
 
