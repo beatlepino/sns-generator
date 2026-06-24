@@ -11,7 +11,9 @@ const CHARACTERS = {
   light: "ノリ軽いキャラ",
   fan: "ファンキャラ",
   sexy: "セクシーキャラ",
-  fresh: "さわやかお兄さん系"
+  fresh: "さわやかお兄さん系",
+  horror: "ホラー系",
+  johnnys: "ジャニオタ系"
 };
 
 const CHARACTER_PROMPTS = {
@@ -24,7 +26,9 @@ const CHARACTER_PROMPTS = {
   light: "ノリ軽いキャラ：サクッと「これアツい！」「絶対行ったほうがいい！」みたいな軽いノリで告知してください。",
   fan: "ファンキャラ：熱烈なファン目線で、「絶対見逃せない！」「やばい最高！」という興奮気味な文体で告知してください。",
   sexy: "セクシーキャラ：少し大人っぽく、落ち着いた艶やかな雰囲気で、誘惑するような文体で告知してください。",
-  fresh: "さわやかお兄さん系：爽やかで親しみやすく、誰に対しても好印象を与えるような、明るくポジティブな文体で告知してください。"
+  fresh: "さわやかお兄さん系：爽やかで親しみやすく、誰に対しても好印象を与えるような、明るくポジティブな文体で告知してください。",
+  horror: "ホラー系：少し不気味でゾクッとするような、怪談風の雰囲気で告知してください。",
+  johnnys: "ジャニオタ系：テンション高めで、「推しが尊い！」「担当のビジュが最高！」など、熱狂的なオタク用語を多用してください。"
 };
 
 export default function App() {
@@ -39,7 +43,7 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [isShortening, setIsShortening] = useState([false, false, false]);
 
-  const API_KEY = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || "AQ.Ab8RN6LW0kU7oamHUQAfN5XMz1FQX76kjlFqHneVg5p4I5-PZA";
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
   const shortenUrl = async (index) => {
     const url = urls[index];
@@ -65,19 +69,19 @@ export default function App() {
   };
 
   const generate = async () => {
-    if (!API_KEY || API_KEY === "ここにAPIキーを貼り付けてください") {
+    if (!API_KEY) {
       setMessage({ type: 'error', text: 'APIキーが設定されていません。' });
       return;
     }
     setIsLoading(true);
     setResult('');
     const appended = `${urls.filter(u=>u).join('\n')}\n${hashtags}\n${mention}`.trim();
-    const prompt = `以下の情報を元に、SNS告知文を作成してください。
+    const prompt = `以下のイベント情報に基づき、SNS告知文を作成してください。
 【イベント名】: ${eventName}
 【詳細】: ${eventDetails}
 【キャラクター】: ${CHARACTER_PROMPTS[charKey]}
 【付随情報】: ${appended}
-本文のみを180文字以内で出力してください。`;
+本文と付随情報を合わせ、合計180文字以内で作成してください。挨拶不要、本文のみを出力してください。`;
 
     try {
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent', {
@@ -86,10 +90,14 @@ export default function App() {
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       const data = await response.json();
-      if (data.candidates && data.candidates[0].content) {
-        setResult(`${data.candidates[0].content.parts[0].text.trim()}\n\n${appended}`);
+      
+      // レスポンス構造をより厳密にチェック
+      if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const body = data.candidates[0].content.parts[0].text.trim();
+        setResult(`${body}\n\n${appended}`.trim());
       } else {
-        throw new Error("応答形式エラー");
+        console.error("API Response:", data);
+        throw new Error("APIの応答形式が正しくありません。");
       }
     } catch (e) {
       setMessage({ type: 'error', text: '生成エラー: ' + e.message });
